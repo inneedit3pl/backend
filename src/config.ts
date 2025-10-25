@@ -20,7 +20,7 @@ const Config = {
   payoutFilePath:
     process.env.NODE_ENV === "dev"
       ? `http://localhost:${process.env.PORT}/uploads/tmp/`
-      : `https://${process.env.DOMAIN}/uploads/tmp/`,
+      : `http://${process.env.DOMAIN}/uploads/tmp/`,
 };
 
 export default Config;
