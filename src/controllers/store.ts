@@ -88,13 +88,13 @@ storeRouter.get(
           .json({ error: data.error_message || "API error" });
       }
 
-      const suggestions = data.predictions.map((p: any) => ({
+      const suggestions = data.predictions.map((p: any) => (
         // id: p.place_id,
         // main: p.structured_formatting.main_text,
         // secondary: p.structured_formatting.secondary_text,
-        full_description: p.description,
+      p.description
         // types: p.types,
-      }));
+      ));
 
       res.json({ status: true, data: suggestions, message: "success" });
     } catch (error) {

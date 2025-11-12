@@ -8,10 +8,42 @@ import path from "path";
 import { generateExcel } from "../Utils/generateExcel";
 import upload from "../Utils/multer";
 import xlsx from "xlsx";
+import { sendIciciPayment } from "../Utils/iciciService";
+import axios from "axios";
 
 const DB_COLLECTIONS = Config.DB_COLLECTIONS;
 const riderRouter = Router();
 const service = new MongooseService();
+
+riderRouter.get(
+  "/generatePayouts",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+axios.get("https://apibankingonesandbox.icicibank.com/api/v1/health", {
+  headers: { "x-api-key": "MVcF4C4SGG9tto2dyqjjdHLlFTAYuAhf" }
+})
+.then(r => console.log(r.status))
+.catch(e => console.log(e.response?.status, e.response?.data));
+
+      // const user = {
+      //   amountToPay: 10,
+      //   _id: "123456",
+      //   bankDetails: {
+      //     accountNo: "1845778215",
+      //     ifsc: "KKBK0007631",
+      //     accountName: "Arepalli Gowtham",
+      //   },
+      // };
+      // const response = await sendIciciPayment(user);
+      // console.log(response, "response");
+      return res
+        .status(200)
+        // .json({ status: true, message: "success", data: response });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 riderRouter.post(
   "/",
@@ -403,6 +435,7 @@ riderRouter.get(
           no_Of_Orders: "",
           totalEarnings: "",
           carryForwardAmount: "",
+          // totalDeductionAmount:""
         },
       ];
       const { fileId, filePath } = await generateExcel(data);
@@ -714,7 +747,7 @@ riderRouter.get(
         note: item?.note,
         deductedById: item?.deductedById?.name,
         status: item?.status,
-        createdOn: item?.createdOn,
+        createdAt: item?.createdAt,
       }));
       return res
         .status(200)
@@ -756,7 +789,7 @@ riderRouter.post(
 
       // --- Step 2: Prepare payout objects ---
       const payouts = rows.map((row) => ({
-        registeredId: row.registeredId,
+        registeredId: row.ClientRegisteredId,
         mobile: row.mobile,
         no_Of_Days: Number(row.no_Of_Days) || 0,
         no_Of_Orders: Number(row.no_Of_Orders) || 0,
@@ -803,6 +836,35 @@ riderRouter.post(
         mobile: { $in: mobiles },
       });
 
+      // --- Step 7: Calculate amountPayable and assign clientId ---
+      for (let p of payouts) {
+        const deductions = await service.aggregate(DB_COLLECTIONS.deductions, [
+          {
+            $match: {
+              mobile: String(p.mobile),
+              registeredId: String(p.registeredId),
+              status: 0,
+              type: "DEBIT",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalAmount: { $sum: "$amount" },
+            },
+          },
+          {
+            $project: {
+              totalAmount: 1,
+            },
+          },
+        ]);
+        const modifiedDeduction =
+          deductions[0]?.totalAmount - Number(p.carryForwardAmount) || 0;
+        p.amountPayable = Number(p.totalEarnings) - modifiedDeduction;
+        p.totalDeductionAmount = deductions[0]?.totalAmount;
+      }
+
       // --- Step 8: Update all DEBIT deductions to status 1 in bulk ---
       await service.updateMany(
         DB_COLLECTIONS.deductions,
@@ -838,19 +900,6 @@ riderRouter.post(
           ordered: false,
         });
       }
-
-      // --- Step 7: Calculate amountPayable and assign clientId ---
-      payouts.forEach((p) => {
-        const modifiedDeduction =
-          Number(p.totalDeductionAmount) - Number(p.carryForwardAmount) || 0;
-        p.amountPayable = Number(p.totalEarnings) - modifiedDeduction;
-
-        // if (!p.clientId) {
-        //   const rider = riders.find((r) => r.mobile === p.mobile);
-        //   p.clientId = rider?.clientId || null;
-        // }
-      });
-
       // --- Step 9: Insert payouts in bulk ---
       let success: any[] = [];
       let failed: { row: any; error: string }[] = [];
