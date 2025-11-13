@@ -24,4 +24,7 @@ app.use(requestLogger);
 app.use(Config.API_PREFIX, apiRouter);
 app.use(errorHandler);
 
+app.get('/api/v1/health', (req, res) => {
+  res.send('OK');
+});
 export default app;
