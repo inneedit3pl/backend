@@ -29,9 +29,9 @@ axios.get("https://apibankingonesandbox.icicibank.com/api/v1/health", {
       //   amountToPay: 10,
       //   _id: "123456",
       //   bankDetails: {
-      //     accountNo: "1845778215",
-      //     ifsc: "KKBK0007631",
-      //     accountName: "Arepalli Gowtham",
+      //     accountNo: "",
+      //     ifsc: "",
+      //     accountName: "",
       //   },
       // };
       // const response = await sendIciciPayment(user);
